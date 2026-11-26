@@ -2,11 +2,11 @@ import { Room, Client, CloseCode } from "colyseus";
 import { WorldState, PlayerState } from "./schema/WorldState.js";
 import {
   AWAY_AFTER_MS, AWAY_CHECK_MS, AD_REWARD_COINS, AD_REWARD_COOLDOWN_MS, DEV_ID_PREFIX, GUEST_ID_PREFIX, ID_PATTERN, IDLE_AFTER_MS, NAME_MAX, PFP_MAX_LEN,
-  PLAY_SECONDS_MAX, RECONNECT_SECONDS, REPLACED_REASON, REPORT_EVERY_MS, ROOM_MAX_CLIENTS, TOKEN_MAX_LEN, TROLL_COOLDOWN_MS, TROLL_TEXT_MAX,
-} from "../constants.js";
+  PLAY_SECONDS_MAX, RECONNECT_SECONDS, REPLACED_REASON, REPORT_EVERY_MS, ROOM_MAX_CLIENTS, TOKEN_MAX_LEN, TROLL_COOLDOWN_MS, TROLL_TEXT_MAX, BRAG_COOLDOWN_MS } from "../constants.js";
 import { Lines } from "../lines.js";
 import { getPlayers, type PlayerDoc } from "../db.js";
-import { progressView, sanitizeProgress } from "../sanitize.js";
+import { isId, progressView, sanitizeProgress } from "../sanitize.js";
+import { claimDaily, dailyFields, dailyView, readDaily, rollDaily, type DailyState } from "../daily.js";
 import { applyAvatar, applyEmote, applyPose, applyTrip } from "../presence.js";
 import { awardBadges, reportScores, reportStats, trustClientIds, verifyReward, verifyToken, type PlayerNumbers } from "../bloxity.js";
 
@@ -32,6 +32,9 @@ interface Numbers {
   trips: number;
   coins: number;
   dex: number; // baby types discovered
+  shinies: number; // shiny babies delivered
+  earned: number; // lifetime coins earned
+  weekBase: number; // babies already counted on the weekly board (delivered at load / last report)
   playtime: number; // s saved before this session
   since: number; // epoch ms this session's play clock started
   sent: string; // the last reported values (only changes go up)
@@ -60,6 +63,9 @@ export class WorldRoom extends Room<{ state: WorldState }> {
   private loaded = new Set<string>();
   private trollAt = new Map<string, number>();
   private adAt = new Map<string, number>();
+  private bragAt = new Map<string, number>();
+  // sessionId -> Daily Reward state (daily.ts), read with the save.
+  private dailies = new Map<string, DailyState>();
   private numbers = new Map<string, Numbers>();
   // sessionId -> epoch ms of the last `alive` beat (only clients that send beats are timed out).
   private beats = new Map<string, number>();
@@ -79,9 +85,9 @@ export class WorldRoom extends Room<{ state: WorldState }> {
       this.track(client.sessionId, patch);
       const players = getPlayers();
       if (!players) return; // Mongo unset/unreachable -- degrade silently
-      // Trips and babies delivered only ever go up ($max), so a stale or replayed save can't lower them.
-      const { trips, delivered, ...rest } = patch;
-      const max = { ...(trips !== undefined && { trips }), ...(delivered !== undefined && { delivered }) };
+      // Trips, babies delivered and coins earned only ever go up ($max), so a stale or replayed save can't lower them.
+      const { trips, delivered, earned, ...rest } = patch;
+      const max = { ...(trips !== undefined && { trips }), ...(delivered !== undefined && { delivered }), ...(earned !== undefined && { earned }) };
       try {
         await players.updateOne(
           { _id: userId },
@@ -126,6 +132,35 @@ export class WorldRoom extends Room<{ state: WorldState }> {
     // relayed to everyone ELSE in the room as `trolled` { id, from, sid, text }. Each client decides
     // whether it hits her (she stands ahead of the sender in that line). Bounded: a slug id, short
     // text, one per TROLL_COOLDOWN_MS.
+    // Daily Reward day `msg.day` (0-based); the client grants it only on ok (daily.ts).
+    claimDaily: async (client: Client, msg: { day?: unknown }) => {
+      const s = this.dailies.get(client.sessionId);
+      const day = msg?.day;
+      if (!s || !this.loaded.has(client.sessionId)) return client.send("dailyResult", { ok: false, day, reason: "loading" });
+      if (rollDaily(s)) void this.saveDaily(client.sessionId, s);
+      if (!claimDaily(s, day)) return client.send("dailyResult", { ok: false, day, reason: "locked", ...dailyView(s) });
+      if (!(await this.saveDaily(client.sessionId, s))) {
+        s.claimed = s.claimed.filter((i) => i !== day);
+        return client.send("dailyResult", { ok: false, day, reason: "save", ...dailyView(s) });
+      }
+      client.send("dailyResult", { ok: true, day, ...dailyView(s) });
+    },
+    dailyRefresh: (client: Client) => {
+      const s = this.dailies.get(client.sessionId);
+      if (!s || !this.loaded.has(client.sessionId)) return;
+      if (rollDaily(s)) void this.saveDaily(client.sessionId, s);
+      client.send("daily", dailyView(s));
+    },
+    // A rare baby was delivered: everyone else gets `bragged` { from, type, shiny, rarity } (a banner).
+    brag: (client: Client, msg: { type?: unknown; shiny?: unknown; rarity?: unknown }) => {
+      const p = this.state.players.get(client.sessionId);
+      const rarity = msg?.rarity;
+      if (!p || !isId(msg?.type) || !Number.isInteger(rarity) || (rarity as number) < 0 || (rarity as number) > 4) return;
+      const now = Date.now();
+      if (now - (this.bragAt.get(client.sessionId) ?? 0) < BRAG_COOLDOWN_MS) return;
+      this.bragAt.set(client.sessionId, now);
+      this.broadcast("bragged", { from: p.username || "A mom", type: msg.type, shiny: msg.shiny === true, rarity }, { except: client });
+    },
     troll: (client: Client, msg: { id?: unknown; text?: unknown }) => {
       const p = this.state.players.get(client.sessionId);
       const id = msg?.id;
@@ -282,6 +317,8 @@ export class WorldRoom extends Room<{ state: WorldState }> {
     this.loaded.delete(sessionId);
     this.trollAt.delete(sessionId);
     this.adAt.delete(sessionId);
+    this.bragAt.delete(sessionId);
+    this.dailies.delete(sessionId);
     this.numbers.delete(sessionId);
     this.beats.delete(sessionId);
     this.lastInput.delete(sessionId);
@@ -361,8 +398,27 @@ export class WorldRoom extends Room<{ state: WorldState }> {
     if (!doc) client.send("noProgress", { serverTime: now, you });
     else client.send("progress", { ...progressView(doc), serverTime: now, you });
     if (userId) {
-      this.numbers.set(client.sessionId, { babies: 0, trips: 0, coins: 0, dex: 0, playtime: Math.min(PLAY_SECONDS_MAX, doc?.playtime ?? 0), since: now, sent: "" });
+      this.numbers.set(client.sessionId, { babies: 0, trips: 0, coins: 0, dex: 0, shinies: 0, earned: 0, weekBase: doc?.delivered ?? 0, playtime: Math.min(PLAY_SECONDS_MAX, doc?.playtime ?? 0), since: now, sent: "" });
       if (doc) this.track(client.sessionId, doc);
+    }
+
+    const daily = readDaily(doc);
+    this.dailies.set(client.sessionId, daily);
+    if (rollDaily(daily)) await this.saveDaily(client.sessionId, daily);
+    if (this.dailies.get(client.sessionId) === daily) client.send("daily", dailyView(daily));
+  }
+
+  // Stores a session's Daily Reward state. True when stored, or when there is nowhere to store it.
+  private async saveDaily(sessionId: string, s: DailyState): Promise<boolean> {
+    const userId = this.userIds.get(sessionId);
+    const players = getPlayers();
+    if (!userId || !players) return true;
+    try {
+      await players.updateOne({ _id: userId }, { $set: { ...dailyFields(s), updatedAt: new Date() }, $setOnInsert: { version: 1 } }, { upsert: true });
+      return true;
+    } catch (err) {
+      console.warn("[WorldRoom] saveDaily failed", err);
+      return false;
     }
   }
 
@@ -373,7 +429,11 @@ export class WorldRoom extends Room<{ state: WorldState }> {
     if (save.delivered !== undefined) n.babies = Math.max(n.babies, save.delivered);
     if (save.trips !== undefined) n.trips = Math.max(n.trips, save.trips);
     if (save.coins !== undefined) n.coins = save.coins;
-    if (save.dex !== undefined) n.dex = Math.max(n.dex, Object.keys(save.dex).length);
+    if (save.dex !== undefined) {
+      n.dex = Math.max(n.dex, Object.keys(save.dex).length);
+      n.shinies = Math.max(n.shinies, Object.values(save.dex).reduce((sum, e) => sum + e.s, 0));
+    }
+    if (save.earned !== undefined) n.earned = Math.max(n.earned, save.earned);
   }
   private playtime(n: Numbers) {
     return Math.min(PLAY_SECONDS_MAX, n.playtime + Math.floor((Date.now() - n.since) / 1000));
@@ -387,11 +447,13 @@ export class WorldRoom extends Room<{ state: WorldState }> {
       if (only && !only.includes(sid)) continue;
       const userId = this.userIds.get(sid);
       if (!userId || userId.startsWith(DEV_ID_PREFIX)) continue;
-      const row = { userId, babies: n.babies, trips: n.trips, coins: n.coins, dex: n.dex, playtime: this.playtime(n) };
+      // The weekly board sums what each report adds: the babies delivered since the last one.
+      const row = { userId, babies: n.babies, trips: n.trips, coins: n.coins, dex: n.dex, shinies: n.shinies, earned: n.earned, week: Math.max(0, n.babies - n.weekBase), playtime: this.playtime(n) };
       rows.push(row);
-      const key = `${row.babies}|${row.trips}|${row.coins}`;
+      const key = `${row.babies}|${row.trips}|${row.coins}|${row.earned}`;
       if (key !== n.sent) {
         n.sent = key;
+        n.weekBase = n.babies;
         changed.push(row);
       }
     }

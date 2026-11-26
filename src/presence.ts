@@ -1,4 +1,4 @@
-import { ANIMS, AVATAR_MAX_LEN, CARRY_PATTERN, EMOTE_PATTERN, HOLD_PATTERN, POSE_BOUNDS, ZONES } from "./constants.js";
+import { ANIMS, AVATAR_MAX_LEN, CARRY_PATTERN, EMOTE_PATTERN, HOLD_PATTERN, POSE_BOUNDS, ZONES, DEX_TYPES_MAX } from "./constants.js";
 import type { PlayerState } from "./rooms/schema/WorldState.js";
 
 // Presence: what the other clients need to draw a player as a fellow mom (client remote.js).
@@ -37,6 +37,7 @@ export function applyTrip(p: PlayerState, msg: unknown): void {
   if (typeof m.belly === "boolean") p.belly = m.belly;
   if (typeof m.twins === "boolean") p.twins = m.twins;
   if (m.carry === "" || (typeof m.carry === "string" && CARRY_PATTERN.test(m.carry))) p.carry = m.carry as string;
+  if (typeof m.dex === "number" && Number.isInteger(m.dex) && m.dex >= 0 && m.dex <= DEX_TYPES_MAX) p.dex = m.dex;
 }
 
 // `emote` { id }: a Bloxity emote the mom plays ("" = stopped).

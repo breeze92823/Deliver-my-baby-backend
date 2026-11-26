@@ -82,6 +82,10 @@ export const COUNT_MAX = 1e7;
 export const BABIES_MAX = 300;
 export const BABY_NAME_MAX = 20;
 export const PLAY_SECONDS_MAX = 31_536_000; // ~1 year
+// Daily Reward (client DAILY.days, daily.ts): days in one calendar cycle.
+export const DAILY_DAYS = 7;
+// Rare-baby announcements (`brag` -> `bragged` to everyone else): one per BRAG_COOLDOWN_MS per session.
+export const BRAG_COOLDOWN_MS = 4000;
 // The Babydex (client DEX in config.js): `dex` { [typeId]: { n: delivered, s: shiny } } for at most
 // DEX_TYPES_MAX types, `dexClaimed` (the collection rewards taken: "t:<type>:<tier>", "r:<rarity>",
 // "all"; at most DEX_CLAIMS_MAX), `pity` (deliveries since the last Epic or better, up to PITY_MAX).
@@ -93,6 +97,9 @@ export const PITY_MAX = 1000;
 // each level up to UPGRADE_LEVEL_MAX (the client caps each at its own max).
 export const UPGRADES_MAX = 32;
 export const UPGRADE_LEVEL_MAX = 10;
+// Nursery decorations owned (client DECOR ids), and Lucky Swaddle tokens held.
+export const DECOR_MAX = 32;
+export const SWADDLES_MAX = 99;
 // Baby types in the client's catalog (characters.js BABY_TYPES): the "full Babydex" badge.
 export const DEX_TOTAL = 24;
 
@@ -113,9 +120,13 @@ export const AD_REWARD_COOLDOWN_MS = 60 * 1000;
 // room's signed-in players (only what changed).
 export const REPORT_EVERY_MS = 30 * 1000;
 // Leaderboards (client LEADERBOARDS in config.js declares the same ids).
+// `babies_week` is a `sum` board reset every Monday 00:00 UTC: each report adds the babies delivered
+// since the last one. `earned` = lifetime coins earned (spending on upgrades never lowers it).
 export const BOARDS = [
   { id: "babies", label: "Babies Delivered", order: "desc", mode: "best", format: "number", reset: "none" },
+  { id: "babies_week", label: "Babies This Week", order: "desc", mode: "sum", format: "number", reset: "weekly" },
   { id: "trips", label: "Hospital Trips", order: "desc", mode: "best", format: "number", reset: "none" },
+  { id: "earned", label: "Top Earners", order: "desc", mode: "best", format: "compact", reset: "none" },
   { id: "coins", label: "Richest Moms", order: "desc", mode: "latest", format: "compact", reset: "none" },
 ] as const;
 // Game stats shown on the Bloxity game page.
@@ -146,4 +157,9 @@ export const BADGES = [
   { key: "coins_10k", name: "Rich Mom", description: "Hold 10,000 coins.", icon: "💰", rarity: "rare", stat: "coins", at: 10_000 },
   { key: "dex_12", name: "Baby Collector", description: "Discover 12 kinds of baby in the Babydex.", icon: "📖", rarity: "rare", stat: "dex", at: 12 },
   { key: "dex_all", name: "Babydex Master", description: "Discover every kind of baby.", icon: "🌟", rarity: "legendary", stat: "dex", at: DEX_TOTAL },
+  { key: "babies_500", name: "Baby Boom", description: "Deliver 500 babies.", icon: "🎉", rarity: "legendary", stat: "babies", at: 500 },
+  { key: "trips_25", name: "Familiar Face", description: "Make 25 hospital trips.", icon: "🩺", rarity: "uncommon", stat: "trips", at: 25 },
+  { key: "shiny_1", name: "Shiny Hunter", description: "Deliver a shiny baby.", icon: "✨", rarity: "rare", stat: "shinies", at: 1 },
+  { key: "shiny_10", name: "Sparkle Collector", description: "Deliver 10 shiny babies.", icon: "💎", rarity: "epic", stat: "shinies", at: 10 },
+  { key: "earned_100k", name: "Big Earner", description: "Earn 100,000 coins in total.", icon: "🏦", rarity: "epic", stat: "earned", at: 100_000 },
 ] as const;

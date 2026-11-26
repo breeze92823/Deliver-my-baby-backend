@@ -50,7 +50,7 @@ describe("Bloxity leaderboards + stats", () => {
     const guest = await colyseus.connectTo(room, { username: "Guest" });
     for (const x of [c, guest]) for (const t of ["noProgress"]) x.onMessage(t, () => {});
     await sleep(100);
-    c.send("saveProgress", { coins: 500, trips: 2, delivered: 3 });
+    c.send("saveProgress", { coins: 500, trips: 2, delivered: 3, earned: 800 });
     guest.send("saveProgress", { coins: 999, trips: 9, delivered: 9 });
     await sleep(100);
     await (room as any).report();
@@ -62,9 +62,11 @@ describe("Bloxity leaderboards + stats", () => {
     assert.deepStrictEqual(boards[0].body.boards.map((b: any) => b.id), BOARDS.map((b) => b.id), "boards declared on the first report");
     assert.deepStrictEqual(boards[0].body.scores, [
       { board: "babies", userId: "legion_acc1", score: 3 },
+      { board: "babies_week", userId: "legion_acc1", score: 3 },
       { board: "trips", userId: "legion_acc1", score: 2 },
+      { board: "earned", userId: "legion_acc1", score: 800 },
       { board: "coins", userId: "legion_acc1", score: 500 },
-    ], "guests are never reported");
+    ], "guests are never reported; the weekly board gets the babies delivered this session");
     assert.strictEqual(stats.length, 1);
     assert.deepStrictEqual(stats[0].body.players.map((p: any) => p.userId), ["legion_acc1"]);
     assert.deepStrictEqual({ ...stats[0].body.players[0].values, time_played: 0 }, { babies_delivered: 3, trips: 2, coins: 500, time_played: 0 });
@@ -76,6 +78,15 @@ describe("Bloxity leaderboards + stats", () => {
     await sleep(100);
     await (room as any).report();
     assert.strictEqual(api.calls.filter((r) => r.url.includes("/leaderboards/")).length, 0);
+
+    // Two more babies: the weekly `sum` board gets just those two, not the total again.
+    c.send("saveProgress", { coins: 400, trips: 3, delivered: 5, earned: 700 });
+    await sleep(100);
+    await (room as any).report();
+    const next = api.calls.filter((r) => r.url.includes("/leaderboards/"));
+    assert.strictEqual(next.length, 1);
+    assert.deepStrictEqual(next[0].body.scores.find((s: any) => s.board === "babies_week"), { board: "babies_week", userId: "legion_acc1", score: 2 });
+    assert.deepStrictEqual(next[0].body.scores.find((s: any) => s.board === "earned"), { board: "earned", userId: "legion_acc1", score: 800 }, "earned never goes down");
   });
 
   it("sends a leaving player's last scores at once", async () => {

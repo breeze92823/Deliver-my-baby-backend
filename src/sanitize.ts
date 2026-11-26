@@ -1,5 +1,5 @@
-import { BABIES_MAX, BABY_NAME_MAX, COINS_MAX, COUNT_MAX, DEX_CLAIM_PATTERN, DEX_CLAIMS_MAX, DEX_TYPES_MAX, ID_PATTERN, PITY_MAX, UPGRADE_LEVEL_MAX, UPGRADES_MAX } from "./constants.js";
-import type { DexEntry, PlayerDoc, SavedBaby } from "./db.js";
+import { BABIES_MAX, BABY_NAME_MAX, COINS_MAX, COUNT_MAX, DEX_CLAIM_PATTERN, DEX_CLAIMS_MAX, DECOR_MAX, DEX_TYPES_MAX, ID_PATTERN, PITY_MAX, SWADDLES_MAX, UPGRADE_LEVEL_MAX, UPGRADES_MAX } from "./constants.js";
+import type { DexEntry, MissionsDoc, PlayerDoc, SavedBaby } from "./db.js";
 
 export function finite(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -55,6 +55,23 @@ export function sanitizeUpgrades(raw: unknown): Record<string, number> {
   return Object.fromEntries(out);
 }
 
+// Daily missions (client missions.js): up to MISSIONS_MAX catalog ids with bounded progress.
+const MISSIONS_MAX = 5;
+export function sanitizeMissions(raw: unknown): MissionsDoc | undefined {
+  if (!isObject(raw) || !finite(raw.day) || !Array.isArray(raw.ids)) return undefined;
+  const prog = Array.isArray(raw.prog) ? raw.prog : [];
+  const claimed = Array.isArray(raw.claimed) ? raw.claimed : [];
+  // Each id keeps its own progress / claim (pairs are dropped together, never shifted).
+  const keep = raw.ids.map((id, i) => ({ id, p: prog[i], c: claimed[i] })).filter((m) => isId(m.id)).slice(0, MISSIONS_MAX);
+  return {
+    day: clampInt(raw.day, 1e6),
+    ids: keep.map((m) => m.id as string),
+    prog: keep.map((m) => (finite(m.p) ? clampInt(m.p, COUNT_MAX) : 0)),
+    claimed: keep.map((m) => m.c === true),
+    bonus: raw.bonus === true,
+  };
+}
+
 // The Babydex rewards taken: known claim keys only, each once.
 export function sanitizeClaims(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -81,6 +98,11 @@ export function sanitizeProgress(raw: unknown): Partial<PlayerDoc> | null {
   if (raw.dexClaimed !== undefined) out.dexClaimed = sanitizeClaims(raw.dexClaimed);
   if (finite(raw.pity)) out.pity = clampInt(raw.pity, PITY_MAX);
   if (raw.upg !== undefined) out.upg = sanitizeUpgrades(raw.upg);
+  if (finite(raw.earned)) out.earned = clampInt(raw.earned, COINS_MAX);
+  if (finite(raw.swaddles)) out.swaddles = clampInt(raw.swaddles, SWADDLES_MAX);
+  if (Array.isArray(raw.decor)) out.decor = [...new Set(raw.decor.filter(isId))].slice(0, DECOR_MAX) as string[];
+  const missions = sanitizeMissions(raw.missions);
+  if (missions) out.missions = missions;
   return out;
 }
 

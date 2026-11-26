@@ -57,4 +57,17 @@ describe("sanitizeProgress", () => {
     assert.strictEqual(Object.getPrototypeOf(out.upg), Object.prototype, "a __proto__ key never swaps the prototype");
     assert.deepStrictEqual(sanitizeProgress({ upg: [1, 2] })!.upg, {});
   });
+
+  it("bounds lifetime earnings and the daily missions", () => {
+    assert.strictEqual(sanitizeProgress({ earned: 12.9 })!.earned, 12);
+    const out = sanitizeProgress({ missions: { day: 20500, ids: ["deliver2", "bad id!", "perfect5"], prog: [1, 99, 4], claimed: [true, true, "yes"], bonus: 1 } })!;
+    assert.deepStrictEqual(out.missions, { day: 20500, ids: ["deliver2", "perfect5"], prog: [1, 4], claimed: [true, false], bonus: false }, "each id keeps its own progress");
+    assert.ok(!("missions" in sanitizeProgress({ missions: { ids: [] } })!), "no day: dropped");
+  });
+
+  it("bounds swaddle tokens and the nursery decorations", () => {
+    const out = sanitizeProgress({ swaddles: 1e6, decor: ["nightlight", "nightlight", "bad id!", 3, "train"] })!;
+    assert.strictEqual(out.swaddles, 99);
+    assert.deepStrictEqual(out.decor, ["nightlight", "train"]);
+  });
 });

@@ -17,6 +17,14 @@ export interface PlayerDoc {
   dexClaimed?: string[]; // Babydex rewards already taken ("t:dino:1", "r:0", "all")
   pity?: number; // deliveries since the last Epic or better baby
   upg?: Record<string, number>; // permanent upgrade levels by id (bought with coins)
+  earned?: number; // lifetime coins earned, only ever goes up ($max)
+  swaddles?: number; // Lucky Swaddle tokens (day-7 Daily Reward): the next baby is Rare or better
+  decor?: string[]; // nursery decorations owned (client decor.js ids)
+  missions?: MissionsDoc; // today's daily missions (client-run, on the server's UTC day)
+  // Daily Reward (daily.ts): written by the server only, never by saveProgress.
+  dailyDay?: number;
+  dailyLast?: number;
+  dailyClaimed?: number[];
   playtime?: number; // s connected, counted by the server
   lastSeen?: number; // epoch ms of the last activity
   // Rewarded ads: epoch ms of the last verified reward (written by the server only).
@@ -30,6 +38,15 @@ export interface SavedBaby {
   name: string;
   type: string;
   shiny?: true;
+}
+
+// Daily missions: the UTC day they are for, their ids, progress and which were claimed (+ the bonus chest).
+export interface MissionsDoc {
+  day: number;
+  ids: string[];
+  prog: number[];
+  claimed: boolean[];
+  bonus: boolean;
 }
 
 // One Babydex entry: babies of that type delivered, and how many of them were shiny.

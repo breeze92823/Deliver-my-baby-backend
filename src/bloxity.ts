@@ -100,6 +100,9 @@ export interface PlayerNumbers {
   trips: number;
   coins: number;
   dex: number; // baby types discovered (Babydex)
+  shinies: number; // shiny babies delivered
+  earned: number; // lifetime coins earned
+  week: number; // babies delivered since the last report (the weekly `sum` board)
   playtime: number; // s
 }
 
@@ -109,7 +112,9 @@ export async function reportScores(rows: PlayerNumbers[]): Promise<void> {
   if (!canReport() || !rows.length) return;
   const scores = rows.flatMap((r) => [
     { board: "babies", userId: reportUserId(r.userId), score: r.babies },
+    ...(r.week > 0 ? [{ board: "babies_week", userId: reportUserId(r.userId), score: r.week }] : []),
     { board: "trips", userId: reportUserId(r.userId), score: r.trips },
+    { board: "earned", userId: reportUserId(r.userId), score: r.earned },
     { board: "coins", userId: reportUserId(r.userId), score: r.coins },
   ]);
   try {

@@ -27,6 +27,7 @@ export const PlayerState = schema(
     belly: t.boolean().default(true), // still expecting (the baby bump is drawn)
     twins: t.boolean().default(false), // twins pass: the bigger bump
     carry: t.string().default(""), // babies in their arms, "type:Name,type:Name" ("" = none)
+    dex: t.uint8().default(0), // Babydex: baby types discovered (shown on the name tag)
     // set by the server: their game stopped (no `alive` beat for AWAY_AFTER_MS, an `away` message, or a
     // dropped connection waiting to reconnect). The others drop them from their lines + held spots.
     away: t.boolean().default(false),

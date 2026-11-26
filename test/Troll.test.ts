@@ -48,4 +48,25 @@ describe("troll relay", () => {
     assert.deepStrictEqual(gotA.map((m) => m.id), ["kill"]);
     assert.strictEqual(gotA[0].text, "");
   });
+
+  it("relays a rare-baby brag to everyone else, bounded and rate-limited", async () => {
+    const room = await colyseus.createRoom<WorldState>("world", {});
+    const a = await colyseus.connectTo(room, { username: "Ann" });
+    const b = await colyseus.connectTo(room, { username: "Bea" });
+    for (const x of [a, b]) x.onMessage("noProgress", () => {});
+    const got: any[] = [];
+    const mine: any[] = [];
+    b.onMessage("bragged", (m: any) => got.push(m));
+    a.onMessage("bragged", (m: any) => mine.push(m));
+    await sleep(100);
+    a.send("brag", { type: "golden", shiny: true, rarity: 4 });
+    a.send("brag", { type: "cosmic", shiny: false, rarity: 4 }); // too soon
+    await sleep(150);
+    assert.deepStrictEqual(got, [{ from: "Ann", type: "golden", shiny: true, rarity: 4 }]);
+    assert.strictEqual(mine.length, 0, "never echoed to the sender");
+    b.send("brag", { type: "bad type!", rarity: 4 });
+    b.send("brag", { type: "dino", rarity: 9 });
+    await sleep(150);
+    assert.strictEqual(mine.length, 0, "malformed brags are dropped");
+  });
 });
