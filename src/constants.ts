@@ -119,3 +119,15 @@ export const ID_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
 export const GUEST_ID_PREFIX = "guest-";
 // Local dev without the Bloxity SDK plays as `dev-...` (trusted only outside production, bloxity.ts).
 export const DEV_ID_PREFIX = "dev-";
+
+// Game badges (docs.bloxity.io "Game badges"): earned from the numbers the server already tracks.
+// Max 50 per game; rarity common|uncommon|rare|epic|legendary. Badges pay no Gems or XP.
+export const BADGES = [
+  { key: "first_baby", name: "First Baby", description: "Deliver your first baby.", icon: "👶", rarity: "common", stat: "babies", at: 1 },
+  { key: "babies_10", name: "Seasoned Mom", description: "Deliver 10 babies.", icon: "🍼", rarity: "uncommon", stat: "babies", at: 10 },
+  { key: "babies_50", name: "Baby Factory", description: "Deliver 50 babies.", icon: "🏭", rarity: "rare", stat: "babies", at: 50 },
+  { key: "babies_200", name: "Legendary Mom", description: "Deliver 200 babies.", icon: "👑", rarity: "legendary", stat: "babies", at: 200 },
+  { key: "trips_10", name: "Frequent Visitor", description: "Make 10 hospital trips.", icon: "🏥", rarity: "common", stat: "trips", at: 10 },
+  { key: "trips_100", name: "Hospital Regular", description: "Make 100 hospital trips.", icon: "🚑", rarity: "epic", stat: "trips", at: 100 },
+  { key: "coins_10k", name: "Rich Mom", description: "Hold 10,000 coins.", icon: "💰", rarity: "rare", stat: "coins", at: 10_000 },
+] as const;

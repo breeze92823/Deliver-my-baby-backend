@@ -3,10 +3,11 @@
 //   - rewarded ads: a reward token -> valid or not (POST /v1/ads/reward/verify)
 //   - hosted leaderboards: scores of signed-in players (POST /v1/leaderboards/hosted/{game}/report)
 //   - game stats: the game page's player stats (POST /v1/games/{game}/stats)
+//   - game badges: declared once, awarded on milestones (POST /v1/game-badges/hosted/{game}/declare|award)
 // Bloxity hosting injects BLOXITY_API_URL / BLOXITY_GAME_ID / BLOXITY_REPORT_TOKEN (and BLOXITY_ENV);
 // the prod API is the fallback. None of these may throw into a room: failures are logged and
 // answer "not verified" / skip the report.
-import { BOARDS, STATS } from "./constants.js";
+import { BADGES, BOARDS, STATS } from "./constants.js";
 
 export const apiUrl = () => (process.env.BLOXITY_API_URL || "https://api.bloxity.io").replace(/\/$/, "");
 // The game id is the client's GAME_SLUG (src/config.js), also the Legion game id.
@@ -143,5 +144,31 @@ export async function reportStats(rows: PlayerNumbers[]): Promise<void> {
     if (status !== 200) console.warn("[bloxity] stats report", status, json);
   } catch (err) {
     console.warn("[bloxity] stats report failed", (err as Error)?.message ?? err);
+  }
+}
+
+// --- Game badges ---------------------------------------------------------------------------------------
+let badgesDeclared = false;
+const awarded = new Set<string>(); // "<userId>|<key>" already sent this process (Bloxity also dedupes)
+export async function awardBadges(rows: PlayerNumbers[]): Promise<void> {
+  if (!canReport() || !rows.length) return;
+  const base = `${apiUrl()}/v1/game-badges/hosted/${encodeURIComponent(gameId())}`;
+  const auth = { authorization: `Bearer ${reportToken()}` };
+  const awards = rows.flatMap((r) =>
+    BADGES.filter((b) => r[b.stat] >= b.at && !awarded.has(`${r.userId}|${b.key}`)).map((b) => ({ userId: reportUserId(r.userId), key: b.key, mark: `${r.userId}|${b.key}` })),
+  );
+  if (!awards.length) return;
+  try {
+    if (!badgesDeclared) {
+      const d = await post(`${base}/declare`, { badges: BADGES.map(({ key, name, description, icon, rarity }) => ({ key, name, description, icon, rarity })) }, auth);
+      if (d.status !== 200) return void console.warn("[bloxity] badge declare", d.status, d.json);
+      badgesDeclared = true;
+    }
+    const batch = awards.slice(0, 200);
+    const { status, json } = await post(`${base}/award`, { awards: batch.map(({ userId, key }) => ({ userId, key })) }, auth);
+    if (status === 200) for (const a of batch) awarded.add(a.mark);
+    else console.warn("[bloxity] badge award", status, json);
+  } catch (err) {
+    console.warn("[bloxity] badge award failed", (err as Error)?.message ?? err);
   }
 }

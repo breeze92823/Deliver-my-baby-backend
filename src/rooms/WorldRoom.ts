@@ -8,7 +8,7 @@ import { Lines } from "../lines.js";
 import { getPlayers, type PlayerDoc } from "../db.js";
 import { progressView, sanitizeProgress } from "../sanitize.js";
 import { applyAvatar, applyEmote, applyPose, applyTrip } from "../presence.js";
-import { reportScores, reportStats, trustClientIds, verifyReward, verifyToken, type PlayerNumbers } from "../bloxity.js";
+import { awardBadges, reportScores, reportStats, trustClientIds, verifyReward, verifyToken, type PlayerNumbers } from "../bloxity.js";
 
 function sanitizeName(raw: unknown): string {
   return typeof raw === "string" ? raw.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, NAME_MAX) : "";
@@ -393,6 +393,6 @@ export class WorldRoom extends Room<{ state: WorldState }> {
         changed.push(row);
       }
     }
-    await Promise.all([reportScores(changed), reportStats(rows)]);
+    await Promise.all([reportScores(changed), reportStats(rows), awardBadges(rows)]);
   }
 }
