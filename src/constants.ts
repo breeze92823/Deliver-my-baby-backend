@@ -54,7 +54,8 @@ export const ANIMS = ["", "sit", "phone", "shock", "ko", "lie"] as const;
 // A spot a mom holds so no one else is sent to it: "lobby:2", "waiting:0".
 export const HOLD_PATTERN = /^(lobby|waiting|breathing|ultrasound|final):\d{1,2}$/;
 // What a mom carries home (client remote.js): "type:Name" per baby, comma separated.
-export const CARRY_PATTERN = /^([a-z]{1,16}:[A-Za-z][A-Za-z ]{0,19})(,[a-z]{1,16}:[A-Za-z][A-Za-z ]{0,19}){0,1}$/;
+// A shiny baby's type carries a trailing "*" ("golden*:Maple").
+export const CARRY_PATTERN = /^([a-z]{1,16}\*?:[A-Za-z][A-Za-z ]{0,19})(,[a-z]{1,16}\*?:[A-Za-z][A-Za-z ]{0,19}){0,1}$/;
 
 // Colyseus drops the whole connection for a WebSocket message above this (default 4 KB).
 export const MAX_PAYLOAD_BYTES = 64 * 1024;
@@ -81,6 +82,19 @@ export const COUNT_MAX = 1e7;
 export const BABIES_MAX = 300;
 export const BABY_NAME_MAX = 20;
 export const PLAY_SECONDS_MAX = 31_536_000; // ~1 year
+// The Babydex (client DEX in config.js): `dex` { [typeId]: { n: delivered, s: shiny } } for at most
+// DEX_TYPES_MAX types, `dexClaimed` (the collection rewards taken: "t:<type>:<tier>", "r:<rarity>",
+// "all"; at most DEX_CLAIMS_MAX), `pity` (deliveries since the last Epic or better, up to PITY_MAX).
+export const DEX_TYPES_MAX = 64;
+export const DEX_CLAIMS_MAX = 400;
+export const DEX_CLAIM_PATTERN = /^(t:[a-z]{1,16}:[1-3]|r:[0-4]|all)$/;
+export const PITY_MAX = 1000;
+// Permanent upgrades (client UPGRADES in config.js): `upg` { [id]: level }, at most UPGRADES_MAX ids,
+// each level up to UPGRADE_LEVEL_MAX (the client caps each at its own max).
+export const UPGRADES_MAX = 32;
+export const UPGRADE_LEVEL_MAX = 10;
+// Baby types in the client's catalog (characters.js BABY_TYPES): the "full Babydex" badge.
+export const DEX_TOTAL = 24;
 
 // Trolls (client: Kill / Kill All on real moms): one relayed troll per session every
 // TROLL_COOLDOWN_MS (client NET.trollCooldown: it refuses a Kill before charging for it instead of
@@ -130,4 +144,6 @@ export const BADGES = [
   { key: "trips_10", name: "Frequent Visitor", description: "Make 10 hospital trips.", icon: "🏥", rarity: "common", stat: "trips", at: 10 },
   { key: "trips_100", name: "Hospital Regular", description: "Make 100 hospital trips.", icon: "🚑", rarity: "epic", stat: "trips", at: 100 },
   { key: "coins_10k", name: "Rich Mom", description: "Hold 10,000 coins.", icon: "💰", rarity: "rare", stat: "coins", at: 10_000 },
+  { key: "dex_12", name: "Baby Collector", description: "Discover 12 kinds of baby in the Babydex.", icon: "📖", rarity: "rare", stat: "dex", at: 12 },
+  { key: "dex_all", name: "Babydex Master", description: "Discover every kind of baby.", icon: "🌟", rarity: "legendary", stat: "dex", at: DEX_TOTAL },
 ] as const;

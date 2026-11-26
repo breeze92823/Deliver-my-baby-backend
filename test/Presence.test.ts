@@ -17,14 +17,14 @@ describe("presence (fellow moms)", () => {
     const a = await colyseus.connectTo(room, {
       userId: "guest-a",
       pose: { x: 3, y: 0.5, z: -12, yaw: Math.PI, speed: 4, grounded: false, anim: "sit" },
-      trip: { zone: "lobby", line: "lobby", hold: "lobby:1", belly: false, twins: true, carry: "dino:Maple,royal:Bean" },
+      trip: { zone: "lobby", line: "lobby", hold: "lobby:1", belly: false, twins: true, carry: "dino*:Maple,royal:Bean" },
       avatar: '{"equipped":{}}',
     });
     await sleep(50);
     const p = room.state.players.get(a.sessionId)!;
     assert.deepStrictEqual([p.x, p.y, p.z, p.speed, p.grounded, p.anim], [3, 0.5, -12, 4, false, "sit"]);
     assert.ok(Math.abs(Math.abs(p.yaw) - Math.PI) < 1e-5);
-    assert.deepStrictEqual([p.zone, p.line, p.hold, p.belly, p.twins, p.carry], ["lobby", "", "lobby:1", false, true, "dino:Maple,royal:Bean"], "line is server-owned (joinLine)");
+    assert.deepStrictEqual([p.zone, p.line, p.hold, p.belly, p.twins, p.carry], ["lobby", "", "lobby:1", false, true, "dino*:Maple,royal:Bean"], "line is server-owned (joinLine); a shiny type ends in *");
     assert.strictEqual(p.avatar, '{"equipped":{}}');
   });
 

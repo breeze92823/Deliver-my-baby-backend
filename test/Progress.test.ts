@@ -35,6 +35,14 @@ describe("progress", () => {
     assert.strictEqual(doc.delivered, 14);
     assert.strictEqual(doc.username, "Ann");
     assert.ok(!("hack" in doc));
+
+    c.send("saveProgress", { dex: { dino: { n: 2, s: 1 } }, dexClaimed: ["r:1"], pity: 4, upg: { shoes: 3 } });
+    await sleep(150);
+    assert.deepStrictEqual(fake.docs.get("u1")!.dex, { dino: { n: 2, s: 1 } });
+    assert.deepStrictEqual(fake.docs.get("u1")!.dexClaimed, ["r:1"]);
+    assert.strictEqual(fake.docs.get("u1")!.pity, 4);
+    assert.deepStrictEqual(fake.docs.get("u1")!.upg, { shoes: 3 });
+    assert.strictEqual(fake.docs.get("u1")!.coins, 7000, "a partial save leaves the rest");
   });
 
   it("creates a new account's save and never saves a guest", async () => {

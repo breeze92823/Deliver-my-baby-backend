@@ -31,6 +31,7 @@ interface Numbers {
   babies: number;
   trips: number;
   coins: number;
+  dex: number; // baby types discovered
   playtime: number; // s saved before this session
   since: number; // epoch ms this session's play clock started
   sent: string; // the last reported values (only changes go up)
@@ -360,7 +361,7 @@ export class WorldRoom extends Room<{ state: WorldState }> {
     if (!doc) client.send("noProgress", { serverTime: now, you });
     else client.send("progress", { ...progressView(doc), serverTime: now, you });
     if (userId) {
-      this.numbers.set(client.sessionId, { babies: 0, trips: 0, coins: 0, playtime: Math.min(PLAY_SECONDS_MAX, doc?.playtime ?? 0), since: now, sent: "" });
+      this.numbers.set(client.sessionId, { babies: 0, trips: 0, coins: 0, dex: 0, playtime: Math.min(PLAY_SECONDS_MAX, doc?.playtime ?? 0), since: now, sent: "" });
       if (doc) this.track(client.sessionId, doc);
     }
   }
@@ -372,6 +373,7 @@ export class WorldRoom extends Room<{ state: WorldState }> {
     if (save.delivered !== undefined) n.babies = Math.max(n.babies, save.delivered);
     if (save.trips !== undefined) n.trips = Math.max(n.trips, save.trips);
     if (save.coins !== undefined) n.coins = save.coins;
+    if (save.dex !== undefined) n.dex = Math.max(n.dex, Object.keys(save.dex).length);
   }
   private playtime(n: Numbers) {
     return Math.min(PLAY_SECONDS_MAX, n.playtime + Math.floor((Date.now() - n.since) / 1000));
@@ -385,7 +387,7 @@ export class WorldRoom extends Room<{ state: WorldState }> {
       if (only && !only.includes(sid)) continue;
       const userId = this.userIds.get(sid);
       if (!userId || userId.startsWith(DEV_ID_PREFIX)) continue;
-      const row = { userId, babies: n.babies, trips: n.trips, coins: n.coins, playtime: this.playtime(n) };
+      const row = { userId, babies: n.babies, trips: n.trips, coins: n.coins, dex: n.dex, playtime: this.playtime(n) };
       rows.push(row);
       const key = `${row.babies}|${row.trips}|${row.coins}`;
       if (key !== n.sent) {

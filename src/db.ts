@@ -13,6 +13,10 @@ export interface PlayerDoc {
   babies?: SavedBaby[]; // the latest BABIES_MAX babies, oldest first (the home crib shows the last ones)
   trips?: number; // hospital trips finished (a delivery), only ever goes up
   delivered?: number; // babies delivered in total, only ever goes up
+  dex?: Record<string, DexEntry>; // the Babydex: every baby type ever delivered (not cut like `babies`)
+  dexClaimed?: string[]; // Babydex rewards already taken ("t:dino:1", "r:0", "all")
+  pity?: number; // deliveries since the last Epic or better baby
+  upg?: Record<string, number>; // permanent upgrade levels by id (bought with coins)
   playtime?: number; // s connected, counted by the server
   lastSeen?: number; // epoch ms of the last activity
   // Rewarded ads: epoch ms of the last verified reward (written by the server only).
@@ -25,6 +29,13 @@ export interface PlayerDoc {
 export interface SavedBaby {
   name: string;
   type: string;
+  shiny?: true;
+}
+
+// One Babydex entry: babies of that type delivered, and how many of them were shiny.
+export interface DexEntry {
+  n: number;
+  s: number;
 }
 
 let client: MongoClient | null = null;

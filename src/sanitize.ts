@@ -1,5 +1,5 @@
-import { BABIES_MAX, BABY_NAME_MAX, COINS_MAX, COUNT_MAX, ID_PATTERN } from "./constants.js";
-import type { PlayerDoc, SavedBaby } from "./db.js";
+import { BABIES_MAX, BABY_NAME_MAX, COINS_MAX, COUNT_MAX, DEX_CLAIM_PATTERN, DEX_CLAIMS_MAX, DEX_TYPES_MAX, ID_PATTERN, PITY_MAX, UPGRADE_LEVEL_MAX, UPGRADES_MAX } from "./constants.js";
+import type { DexEntry, PlayerDoc, SavedBaby } from "./db.js";
 
 export function finite(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -22,9 +22,48 @@ export function sanitizeBabies(raw: unknown): SavedBaby[] {
   for (const b of raw.slice(-BABIES_MAX)) {
     if (!isObject(b) || !isId(b.type) || typeof b.name !== "string") continue;
     const name = b.name.replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, BABY_NAME_MAX);
-    if (name) out.push({ name, type: b.type });
+    if (name) out.push(b.shiny === true ? { name, type: b.type, shiny: true } : { name, type: b.type });
   }
   return out;
+}
+
+// The Babydex { [typeId]: { n, s } }: catalog ids only, counts bounded, shiny never above delivered.
+// Built with fromEntries so an id like "__proto__" stays a plain key.
+export function sanitizeDex(raw: unknown): Record<string, DexEntry> {
+  if (!isObject(raw)) return {};
+  const out: [string, DexEntry][] = [];
+  for (const [k, v] of Object.entries(raw)) {
+    if (out.length >= DEX_TYPES_MAX) break;
+    if (!isId(k) || !isObject(v) || !finite(v.n)) continue;
+    const n = clampInt(v.n, COUNT_MAX);
+    const s = finite(v.s) ? Math.min(n, clampInt(v.s, COUNT_MAX)) : 0;
+    if (n > 0) out.push([k, { n, s }]);
+  }
+  return Object.fromEntries(out);
+}
+
+// Upgrade levels { [id]: level }: catalog ids, whole levels 1..UPGRADE_LEVEL_MAX.
+export function sanitizeUpgrades(raw: unknown): Record<string, number> {
+  if (!isObject(raw)) return {};
+  const out: [string, number][] = [];
+  for (const [k, v] of Object.entries(raw)) {
+    if (out.length >= UPGRADES_MAX) break;
+    if (!isId(k) || !finite(v)) continue;
+    const lvl = clampInt(v, UPGRADE_LEVEL_MAX);
+    if (lvl > 0) out.push([k, lvl]);
+  }
+  return Object.fromEntries(out);
+}
+
+// The Babydex rewards taken: known claim keys only, each once.
+export function sanitizeClaims(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out = new Set<string>();
+  for (const c of raw) {
+    if (out.size >= DEX_CLAIMS_MAX) break;
+    if (typeof c === "string" && DEX_CLAIM_PATTERN.test(c)) out.add(c);
+  }
+  return [...out];
 }
 
 // The game is client-authoritative -- no server-side gameplay validation. What IS enforced:
@@ -38,6 +77,10 @@ export function sanitizeProgress(raw: unknown): Partial<PlayerDoc> | null {
   if (raw.babies !== undefined) out.babies = sanitizeBabies(raw.babies);
   if (finite(raw.trips)) out.trips = clampInt(raw.trips, COUNT_MAX);
   if (finite(raw.delivered)) out.delivered = clampInt(raw.delivered, COUNT_MAX);
+  if (raw.dex !== undefined) out.dex = sanitizeDex(raw.dex);
+  if (raw.dexClaimed !== undefined) out.dexClaimed = sanitizeClaims(raw.dexClaimed);
+  if (finite(raw.pity)) out.pity = clampInt(raw.pity, PITY_MAX);
+  if (raw.upg !== undefined) out.upg = sanitizeUpgrades(raw.upg);
   return out;
 }
 

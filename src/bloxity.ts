@@ -99,6 +99,7 @@ export interface PlayerNumbers {
   babies: number; // babies delivered
   trips: number;
   coins: number;
+  dex: number; // baby types discovered (Babydex)
   playtime: number; // s
 }
 
