@@ -1,8 +1,8 @@
 {
   "private": true,
-  "name": "bowling-roll-server",
+  "name": "deliver-my-baby-server",
   "version": "0.1.0",
-  "description": "Colyseus server for Bowling Roll: progress saving and the room roster",
+  "description": "Colyseus server for Deliver My Baby: saves, the fellow-moms roster and the shared lines",
   "type": "module",
   "main": "build/index.js",
   "engines": {
